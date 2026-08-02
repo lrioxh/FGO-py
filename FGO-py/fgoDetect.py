@@ -103,10 +103,23 @@ class XDetectBase(metaclass=logMeta(logger)):
     def isBattleDefeated(self):return self._compare(self.tmpl.DEFEATED,(603,100,690,176))
     def isBattleFinished(self):return self._compare(self.tmpl.DROPITEM,(110,30,264,76))
     def isBattleFormation(self):return self._compare(self.tmpl.BATTLEBEGIN,(1070,632,1270,710))
+    def isCardSelection(self):return all(
+        self._select(
+            (self.tmpl.ARTS,self.tmpl.QUICK,self.tmpl.BUSTER),
+            (80+257*i,537,131+257*i,581),
+        )is not None
+        for i in range(5)
+    )
     def isChooseFriend(self):return any(self._compare(i,(1189,190,1210,243))for i in(self.tmpl.CHOOSEFRIEND,self.tmpl.CHOOSEFRIENDEX))
     def isCardSealed(self):return[self._compare(self.tmpl.CHARASEALED,(76+257*i,479,225+257*i,533),.3)or any(self._compare(j,(44+257*i,492,68+257*i,528),.14)for j in(self.tmpl.CARDSEALEDARTS,self.tmpl.CARDSEALEDQUICK,self.tmpl.CARDSEALEDBUSTER))for i in range(5)]
     def isFpContinue(self):return self._compare(self.tmpl.FPCONTINUE,(646,639,883,707))
     def isFpSummon(self):return self._compare(self.tmpl.FPSUMMON,(643,20,812,67))
+    def isGameTapPrompt(self):return False
+    def isKukulkanSkillChoice(self):return False
+    def isFormationRestriction(self):return False
+    def isSupportFormationCondition(self):return False
+    def findNext(self):return None
+    def findStoryChoice(self):return None
     def isFriendListEnd(self):return self._isListEnd((1255,709))
     def isHouguReady(self,that=None):return(lambda that:[not any(that._compare(j,(313+231*i,172,515+231*i,258),.52)for j in(self.tmpl.HOUGUSEALED,self.tmpl.CHARASEALED))and(numpy.mean(self._crop((144+319*i,679,156+319*i,684)))>55 or numpy.mean(that._crop((144+319*i,679,156+319*i,684)))>55)for i in range(3)])((time.sleep(.15),type(self)())[1]if that is None else that)
     def isLotteryContinue(self):return self._watchLottery.send(self)
@@ -125,6 +138,8 @@ class XDetectBase(metaclass=logMeta(logger)):
     def isSkillReady(self,i,j):return not self._compare(self.tmpl.STILL,(35+318*i+88*j,598,55+318*i+88*j,618),.2)
     def isSpecialDropRainbowBox(self):return self._compare(self.tmpl.RAINBOW,(957,2,990,40),.1)
     def isSpecialDropSuspended(self):return self._compare(self.tmpl.CLOSE,(6,14,28,68))
+    def isStorySkip(self):return False
+    def isStorySkipConfirm(self):return False
     def isSummonHistoryListEnd(self):return self._isListEnd((1142,552))
     def isSynthesisBegin(self):return self._compare(self.tmpl.SYNTHESIS,(16,12,112,73))
     def isSynthesisFinished(self):return self._compare(self.tmpl.DECIDEDISABLED,(1035,625,1275,711))
@@ -158,7 +173,7 @@ class XDetectBase(metaclass=logMeta(logger)):
     def getFieldServantHp(self,pos):return self._ocrInt((200+317*pos,620,293+317*pos,644))
     def getFieldServantNp(self,pos):return self._ocrInt((220+317*pos,655,271+317*pos,680))
     def getMaterial(self):return(lambda x:{materialImg[i][0]:x.count(i)for i in set(x)-{None}})([self._select(((i[1],None)for i in materialImg),(176+i%7*137,110+i//7*142,253+i%7*137,187+i//7*142),.02)for i in range(1,21)])
-    def getSkillTargetCount(self):return(lambda x:numpy.bincount(numpy.diff(x))[1]+x[0])(cv2.dilate(numpy.max(cv2.threshold(numpy.max(self._crop((306,320,973,547)),axis=2),67,1,cv2.THRESH_BINARY)[1],axis=0).reshape(1,-1),numpy.ones((1,66),numpy.uint8)).ravel())if self._compare(self.tmpl.CROSS,(980,0,1280,300))else 0
+    def getSkillTargetCount(self):return(lambda x:numpy.bincount(numpy.diff(x),minlength=2)[1]+x[0])(cv2.dilate(numpy.max(cv2.threshold(numpy.max(self._crop((306,320,973,547)),axis=2),67,1,cv2.THRESH_BINARY)[1],axis=0).reshape(1,-1),numpy.ones((1,66),numpy.uint8)).ravel())if self._compare(self.tmpl.CROSS,(980,0,1280,300))else 0
     @retryOnError()
     @validate()
     def getStage(self):return self._ocrInt((884,14,902,37))
@@ -174,7 +189,22 @@ class XDetectBase(metaclass=logMeta(logger)):
     def getTeamServantClassRank(self):return[(lambda x:x if x is None else classImg[0][x])(self._select(CLASS[100],(30+200*i+15*(i>2),133,115+200*i+15*(i>2),203)))for i in range(6)]
     def getWeeklyMission(self):XDetectBase._weeklyMission=self._stack(XDetectBase._weeklyMission,self._crop((603,250,1092,710)),157)
     def findChapter(self,chapter):return self._find((chapterImg[chapter],None),(640,90,1230,600))
-    def findFriend(self,img):return self._find(img,(13,166,1233,720),.04)
+    def findFriend(self,img):
+        for scale in(1,.95,1.05,.9,1.1):
+            template=img if scale==1 else(
+                cv2.resize(
+                    img[0],(0,0),fx=scale,fy=scale,
+                    interpolation=cv2.INTER_CUBIC,
+                ),
+                cv2.resize(
+                    img[1],(0,0),fx=scale,fy=scale,
+                    interpolation=cv2.INTER_NEAREST,
+                ),
+            )
+            if pos:=self._find(
+                template,(13,166,1233,720),.06
+            ):
+                return pos
     def findMail(self,img):return self._find(img,(73,166,920,720),.017)
     def findMapCamera(self,chapter):return numpy.array(cv2.minMaxLoc(cv2.matchTemplate(mapImg[chapter],cv2.resize(self._crop((200,200,1080,520)),(0,0),fx=.3,fy=.3,interpolation=cv2.INTER_CUBIC),cv2.TM_SQDIFF_NORMED))[2])/.3+(440,160)
     @classmethod
@@ -193,6 +223,54 @@ class XDetectBase(metaclass=logMeta(logger)):
 class XDetectCN(XDetectBase):
     tmpl=IMG_CN
     ocr=OCR.ZHS
+    def isFormationRestriction(self):
+        text=self.ocr.ocrArea(self._crop((200,60,1080,680)))
+        return(
+            any('编成限制'in i for i in text)
+            and any('关闭'in i for i in text)
+        )
+    def isKukulkanSkillChoice(self):
+        return'不消耗'in(
+            self.ocr.ocrText(self._crop((575,400,720,452)))or''
+        )
+    def _findNextMarker(self):
+        mask=cv2.inRange(
+            cv2.cvtColor(self.im,cv2.COLOR_BGR2HSV),
+            (10,90,100),(45,255,255),
+        )
+        _,_,stats,_=cv2.connectedComponentsWithStats(mask)
+        components=[tuple(map(int,i))for i in stats[1:]]
+        for x,y,w,h,area in components:
+            if not(45<=w<=90 and 14<=h<=30 and area>=250 and w>=2*h and y<500):continue
+            glyphs=[i for i in components if i[4]>=60 and i[1]+i[3]<=y+2 and y-45<=i[1] and x-15<=i[0]+i[2]//2<=x+w+15]
+            if len(glyphs)>=2:return(x+w//2,(min(i[1]for i in glyphs)+y+h)//2)
+    def findNext(self):
+        if pos:=self._findNextMarker():
+            return(pos[0],min(pos[1]+100,680))
+        return self._find(self.tmpl.NEXT,(0,0,1280,720))
+    def findStoryChoice(self):
+        gray=cv2.cvtColor(self.im,cv2.COLOR_BGR2GRAY)
+        dark=(
+            numpy.mean(gray[100:600,150:1130]<35,axis=1)>.65
+        ).astype(numpy.uint8).reshape(-1,1)
+        _,_,stats,_=cv2.connectedComponentsWithStats(dark)
+        cyan=cv2.inRange(
+            cv2.cvtColor(self.im,cv2.COLOR_BGR2HSV),
+            (80,20,100),(115,255,255),
+        )
+        border=numpy.mean(cyan[:,120:1160]>0,axis=1)
+        choices=[]
+        for _,offset,_,height,_ in stats[1:]:
+            y=int(offset)+100
+            height=int(height)
+            if 50<=height<=100 and numpy.max(border[max(0,y-6):y+2])>.7 and numpy.max(border[y+height-1:min(720,y+height+6)])>.7:
+                choices.append((640,y+height//2))
+        if len(choices)>=2:return min(choices,key=lambda pos:pos[1])
+    def isAddFriend(self):return self._compare(self.tmpl.ADDFRIEND,(40,550,520,680))
+    def isGameTapPrompt(self):return self._compare(self.tmpl.GAMETAP,(440,600,840,700))
+    def isSupportFormationCondition(self):return self._compare(self.tmpl.SUPPORTFORMATIONCONDITION,(500,60,780,130))
+    def isStorySkip(self):return self._compare(self.tmpl.STORYSKIPBUTTON,(1100,0,1280,85))
+    def isStorySkipConfirm(self):return self._compare(self.tmpl.STORYSKIP,(425,275,855,365))
     @classmethod
     def saveWeeklyMission(cls):
         result=[]
@@ -222,6 +300,12 @@ class DetectBase(XDetectBase):
         fuse.increase()
         schedule.sleep(postLatency)
     def _compare(self,*args,**kwargs):return super()._compare(*args,**kwargs)and fuse.reset(self)
+    def isCardSelection(self):return super().isCardSelection()and fuse.reset(self)
+    def isKukulkanSkillChoice(self):
+        return super().isKukulkanSkillChoice()and fuse.reset(self)
+    def findStoryChoice(self):
+        if(t:=super().findStoryChoice())is not None:fuse.reset(self)
+        return t
     def _find(self,*args,**kwargs):
         if(t:=super()._find(*args,**kwargs))is not None:fuse.reset(self)
         return t

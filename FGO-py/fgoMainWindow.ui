@@ -338,6 +338,16 @@
               </property>
              </widget>
             </item>
+            <item>
+             <widget class="QPushButton" name="BTN_NEXT">
+              <property name="statusTip">
+               <string>从地图中的“下一个”连续推进国服主线</string>
+              </property>
+              <property name="text">
+               <string>推进主线</string>
+              </property>
+             </widget>
+            </item>
            </layout>
           </item>
           <item>
@@ -471,6 +481,8 @@
     <addaction name="MENU_SETTINGS_DEFEATED"/>
     <addaction name="MENU_SETTINGS_KIZUNAREISOU"/>
     <addaction name="MENU_SETTINGS_SPECIALDROP"/>
+    <addaction name="MENU_SETTINGS_STORYSKIP"/>
+    <addaction name="MENU_SETTINGS_FRIENDALLTAB"/>
    </widget>
    <addaction name="MENU_FILE"/>
    <addaction name="MENU_SCRIPT"/>
@@ -581,6 +593,22 @@
     <string>若干特殊掉落后终止战斗</string>
    </property>
   </action>
+  <action name="MENU_SETTINGS_STORYSKIP">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>自动跳过剧情</string>
+   </property>
+  </action>
+  <action name="MENU_SETTINGS_FRIENDALLTAB">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>助战选择前切换到“合”</string>
+   </property>
+  </action>
   <action name="MENU_ABOUT_LICENSE">
    <property name="text">
     <string>使用许可</string>
@@ -636,6 +664,7 @@
   <tabstop>BTN_MAIN</tabstop>
   <tabstop>BTN_BATTLE</tabstop>
   <tabstop>BTN_CLASSIC</tabstop>
+  <tabstop>BTN_NEXT</tabstop>
   <tabstop>BTN_PAUSE</tabstop>
   <tabstop>BTN_STOP</tabstop>
   <tabstop>BTN_SCREENSHOT</tabstop>
@@ -643,6 +672,12 @@
  </tabstops>
  <resources/>
  <connections>
+  <connection>
+   <sender>BTN_NEXT</sender>
+   <signal>clicked()</signal>
+   <receiver>fgoMainWindow</receiver>
+   <slot>runNext()</slot>
+  </connection>
   <connection>
    <sender>BTN_CLASSIC</sender>
    <signal>clicked()</signal>
@@ -842,6 +877,7 @@
   <slot>runLottery()</slot>
   <slot>runMail()</slot>
   <slot>runMain()</slot>
+  <slot>runNext()</slot>
   <slot>runSummonHistory()</slot>
   <slot>runSynthesis()</slot>
   <slot>screenshot()</slot>

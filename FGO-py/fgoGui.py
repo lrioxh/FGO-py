@@ -40,6 +40,7 @@ class MainWindow(QMainWindow,Ui_fgoMainWindow):
         self.signalFuncBegin.connect(self.funcBegin)
         self.signalFuncEnd.connect(self.funcEnd)
         self.operation=fgoKernel.Operation()
+        self.activeOperation=self.operation
         self.chapter=sorted({i[:2]for i in quest})
         self.CBB_CHAPTER.addItems(QApplication.translate('quest','-'.join(str(j)for j in i))for i in self.chapter)
         self.worker=Thread()
@@ -49,6 +50,8 @@ class MainWindow(QMainWindow,Ui_fgoMainWindow):
             (False,self.CKB_TEAM,lambda x:setattr(fgoKernel.Main,'autoFormation',x)),
             ('stopOnDefeated',self.MENU_SETTINGS_DEFEATED,fgoKernel.schedule.stopOnDefeated),
             ('stopOnKizunaReisou',self.MENU_SETTINGS_KIZUNAREISOU,fgoKernel.schedule.stopOnKizunaReisou),
+            ('storySkip',self.MENU_SETTINGS_STORYSKIP,lambda x:setattr(fgoKernel,'storySkip',x)),
+            ('friendAllTab',self.MENU_SETTINGS_FRIENDALLTAB,lambda x:setattr(fgoKernel.Next,'friendAllTab',x)),
             ('closeToTray',self.MENU_CONTROL_TRAY,None),
             ('stayOnTop',self.MENU_CONTROL_STAYONTOP,lambda x:(self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint,x),self.show())),
             ('notifyEnable',self.MENU_CONTROL_NOTIFY,None),
@@ -111,7 +114,7 @@ class MainWindow(QMainWindow,Ui_fgoMainWindow):
         self.worker=Thread(target=f,name=f'{getattr(func,"__qualname__",repr(func).replace(" ",""))}')
         self.worker.start()
     def flush(self):
-        self.TXT_APPLE.setValue(self.operation.appleTotal)
+        self.TXT_APPLE.setValue(self.activeOperation.appleTotal)
         cur=self.LST_QUEST.currentRow()
         self.LST_QUEST.clear()
         self.LST_QUEST.addItems(f'{i:2}.{k:5}× {QApplication.translate("quest","-".join(str(m)for m in j[:2]))}=={QApplication.translate("quest","-".join(str(m)for m in j))}'for i,(j,k)in enumerate(self.operation))
@@ -120,6 +123,7 @@ class MainWindow(QMainWindow,Ui_fgoMainWindow):
         self.BTN_MAIN.setEnabled(False)
         self.BTN_BATTLE.setEnabled(False)
         self.BTN_CLASSIC.setEnabled(False)
+        self.BTN_NEXT.setEnabled(False)
         self.BTN_PAUSE.setEnabled(True)
         self.BTN_PAUSE.setChecked(False)
         self.BTN_STOP.setEnabled(True)
@@ -131,6 +135,7 @@ class MainWindow(QMainWindow,Ui_fgoMainWindow):
         self.BTN_MAIN.setEnabled(True)
         self.BTN_BATTLE.setEnabled(True)
         self.BTN_CLASSIC.setEnabled(True)
+        self.BTN_NEXT.setEnabled(True)
         self.BTN_PAUSE.setEnabled(False)
         self.BTN_STOP.setEnabled(False)
         self.BTN_STOPLATER.setChecked(False)
@@ -179,13 +184,18 @@ class MainWindow(QMainWindow,Ui_fgoMainWindow):
         self.LBL_DEVICE.setText(fgoDevice.device.name)
         self.MENU_CONTROL_MAPKEY.setChecked(False)
     def runMain(self):
+        self.activeOperation=self.operation
         self.operation.battleClass=fgoKernel.Battle
         self.runFunc(self.operation)
     def runBattle(self):self.runFunc(fgoKernel.Battle())
     def runClassic(self):
         if not Teamup(self).exec():return
+        self.activeOperation=self.operation
         self.operation.battleClass=lambda:fgoKernel.Battle(fgoKernel.ClassicTurn)
         self.runFunc(self.operation)
+    def runNext(self):
+        self.activeOperation=fgoKernel.Next(self.TXT_APPLE.value(),self.CBB_APPLE.currentIndex())
+        self.runFunc(self.activeOperation)
     def pause(self,x):
         if not x and not self.isDeviceAvailable():return self.BTN_PAUSE.setChecked(True)
         fgoKernel.schedule.pause()

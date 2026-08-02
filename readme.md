@@ -1,3 +1,57 @@
+<!-- LOCAL-CHANGES: BEGIN -->
+# 本地新增功能与使用说明
+
+> 本节仅说明当前fork仓的新增及调整。以下分隔线后的内容为原 README。
+
+## Next 主线推进模式（仅国服）
+
+新增 `next` 命令和图形界面的 **Next** 按钮，用于连续推进国服主线：处理助战、编成、战斗、结算、剧情、关卡 `NEXT` 标记及加好友界面。
+
+```text
+next [苹果数量] [苹果类型] [-s 等待时间] [-a 战斗次数] [--no-skip-story] [--friend-search-cycles 次数]
+```
+
+示例：
+
+```text
+next 3 gold -a 10
+next --no-skip-story --friend-search-cycles 8
+```
+
+- 默认跳过剧情；传入 `--no-skip-story` 后按普通剧情流程推进。
+- 默认在选择助战前切换至“合”标签；普通 `main` / `classic` 模式不会切换。
+- 遇到无法确认的 Next 状态会停止脚本，避免盲目点击。
+
+## 助战选择与安全恢复
+
+- 助战模板识别增加多倍率匹配与慢速翻页，降低不同分辨率或缩放下的漏识别。
+- 可限制普通模式的助战搜索次数；到达上限或列表到底时，改为选择当前可见的第一名助战，不再无限翻页。
+- 新增对编成限制、助战编成条件、技能释放失败、库库尔坎技能选项、游戏点击提示等界面的处理。
+- 出牌前会验证指令卡界面；未识别到时停止，避免在未知界面点击。
+- 竖屏截图会自动旋转为横屏识别方向。
+
+常用终端设置（`True` / `False` 为 Python 布尔值）：
+
+```text
+config storySkip True
+config friendSearchMaxCycles 10
+config friendAllTab False
+```
+
+- `storySkip`：常规模式自动跳过剧情；图形界面“设置 → 自动跳过剧情”可切换。
+- `friendSearchMaxCycles`：常规模式搜索助战的最大翻页轮数，默认 `10`。
+- `friendAllTab`：控制 Next 模式是否在选择助战前切换“合”标签，默认 `True`；图形界面“设置 → 助战选择前切换到‘合’”可切换。Next 模式使用 `--friend-search-cycles` 单独设置其搜索上限，默认 `5`。
+
+## 从者适配：奥尔加玛丽（No.444）
+
+- 已加入三阶段场上头像与指令卡头像模板，用于从者和指令卡识别。
+- 技能释放顺序固定为：技能 2 → 技能 3 → 技能 1。
+- 技能 3 仅在自身 NP ≥ 100 时释放。
+- 选卡评分支持“奥尔加玛丽 Extra 为全体攻击”的特性。
+
+---
+<!-- LOCAL-CHANGES: END -->
+
 > 已添加日服支持  
 > 已添加美服支持([#111](https://github.com/hgjazhgj/FGO-py/pull/111))  
 > 已添加台服支持([#114](https://github.com/hgjazhgj/FGO-py/pull/114))  

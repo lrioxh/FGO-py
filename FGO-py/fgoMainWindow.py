@@ -3,7 +3,7 @@
 ################################################################################
 ## Form generated from reading UI file 'fgoMainWindow.ui'
 ##
-## Created by: Qt User Interface Compiler version 6.7.2
+## Created by: Qt User Interface Compiler version 6.11.1
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
@@ -63,6 +63,12 @@ class Ui_fgoMainWindow(object):
         self.MENU_SETTINGS_SPECIALDROP = QAction(fgoMainWindow)
         self.MENU_SETTINGS_SPECIALDROP.setObjectName(u"MENU_SETTINGS_SPECIALDROP")
         self.MENU_SETTINGS_SPECIALDROP.setCheckable(True)
+        self.MENU_SETTINGS_STORYSKIP = QAction(fgoMainWindow)
+        self.MENU_SETTINGS_STORYSKIP.setObjectName(u"MENU_SETTINGS_STORYSKIP")
+        self.MENU_SETTINGS_STORYSKIP.setCheckable(True)
+        self.MENU_SETTINGS_FRIENDALLTAB = QAction(fgoMainWindow)
+        self.MENU_SETTINGS_FRIENDALLTAB.setObjectName(u"MENU_SETTINGS_FRIENDALLTAB")
+        self.MENU_SETTINGS_FRIENDALLTAB.setCheckable(True)
         self.MENU_ABOUT_LICENSE = QAction(fgoMainWindow)
         self.MENU_ABOUT_LICENSE.setObjectName(u"MENU_ABOUT_LICENSE")
         self.MENU_FILE_QUIT = QAction(fgoMainWindow)
@@ -91,27 +97,27 @@ class Ui_fgoMainWindow(object):
         self.CBB_CHAPTER = QComboBox(self.widget)
         self.CBB_CHAPTER.setObjectName(u"CBB_CHAPTER")
 
-        self.LAYOUT_QUESTSELECT.setWidget(0, QFormLayout.FieldRole, self.CBB_CHAPTER)
+        self.LAYOUT_QUESTSELECT.setWidget(0, QFormLayout.ItemRole.FieldRole, self.CBB_CHAPTER)
 
         self.LBL_CHAPTER = QLabel(self.widget)
         self.LBL_CHAPTER.setObjectName(u"LBL_CHAPTER")
 
-        self.LAYOUT_QUESTSELECT.setWidget(0, QFormLayout.LabelRole, self.LBL_CHAPTER)
+        self.LAYOUT_QUESTSELECT.setWidget(0, QFormLayout.ItemRole.LabelRole, self.LBL_CHAPTER)
 
         self.LBL_QUEST = QLabel(self.widget)
         self.LBL_QUEST.setObjectName(u"LBL_QUEST")
 
-        self.LAYOUT_QUESTSELECT.setWidget(1, QFormLayout.LabelRole, self.LBL_QUEST)
+        self.LAYOUT_QUESTSELECT.setWidget(1, QFormLayout.ItemRole.LabelRole, self.LBL_QUEST)
 
         self.CBB_QUEST = QComboBox(self.widget)
         self.CBB_QUEST.setObjectName(u"CBB_QUEST")
 
-        self.LAYOUT_QUESTSELECT.setWidget(1, QFormLayout.FieldRole, self.CBB_QUEST)
+        self.LAYOUT_QUESTSELECT.setWidget(1, QFormLayout.ItemRole.FieldRole, self.CBB_QUEST)
 
         self.LBL_TIMES = QLabel(self.widget)
         self.LBL_TIMES.setObjectName(u"LBL_TIMES")
 
-        self.LAYOUT_QUESTSELECT.setWidget(2, QFormLayout.LabelRole, self.LBL_TIMES)
+        self.LAYOUT_QUESTSELECT.setWidget(2, QFormLayout.ItemRole.LabelRole, self.LBL_TIMES)
 
         self.TXT_TIMES = QSpinBox(self.widget)
         self.TXT_TIMES.setObjectName(u"TXT_TIMES")
@@ -120,7 +126,7 @@ class Ui_fgoMainWindow(object):
         self.TXT_TIMES.setMaximum(114514)
         self.TXT_TIMES.setValue(1)
 
-        self.LAYOUT_QUESTSELECT.setWidget(2, QFormLayout.FieldRole, self.TXT_TIMES)
+        self.LAYOUT_QUESTSELECT.setWidget(2, QFormLayout.ItemRole.FieldRole, self.TXT_TIMES)
 
 
         self.LAYOUT_QUEST.addLayout(self.LAYOUT_QUESTSELECT)
@@ -181,7 +187,7 @@ class Ui_fgoMainWindow(object):
         self.LBL_TEAM = QLabel(self.widget)
         self.LBL_TEAM.setObjectName(u"LBL_TEAM")
 
-        self.LAYOUT_INFO.setWidget(0, QFormLayout.LabelRole, self.LBL_TEAM)
+        self.LAYOUT_INFO.setWidget(0, QFormLayout.ItemRole.LabelRole, self.LBL_TEAM)
 
         self.LAYOUT_INFO_TEAM = QHBoxLayout()
         self.LAYOUT_INFO_TEAM.setObjectName(u"LAYOUT_INFO_TEAM")
@@ -201,13 +207,13 @@ class Ui_fgoMainWindow(object):
         self.LAYOUT_INFO_TEAM.addWidget(self.CKB_TEAM)
 
 
-        self.LAYOUT_INFO.setLayout(0, QFormLayout.FieldRole, self.LAYOUT_INFO_TEAM)
+        self.LAYOUT_INFO.setLayout(0, QFormLayout.ItemRole.FieldRole, self.LAYOUT_INFO_TEAM)
 
         self.LBL_APPLE = QLabel(self.widget)
         self.LBL_APPLE.setObjectName(u"LBL_APPLE")
         self.LBL_APPLE.setMaximumSize(QSize(16777215, 28))
 
-        self.LAYOUT_INFO.setWidget(1, QFormLayout.LabelRole, self.LBL_APPLE)
+        self.LAYOUT_INFO.setWidget(1, QFormLayout.ItemRole.LabelRole, self.LBL_APPLE)
 
         self.LAYOUT_INFO_APPLE = QHBoxLayout()
         self.LAYOUT_INFO_APPLE.setObjectName(u"LAYOUT_INFO_APPLE")
@@ -232,12 +238,12 @@ class Ui_fgoMainWindow(object):
         self.LAYOUT_INFO_APPLE.addWidget(self.TXT_APPLE)
 
 
-        self.LAYOUT_INFO.setLayout(1, QFormLayout.FieldRole, self.LAYOUT_INFO_APPLE)
+        self.LAYOUT_INFO.setLayout(1, QFormLayout.ItemRole.FieldRole, self.LAYOUT_INFO_APPLE)
 
         self.LBL_CURRENTDEVICE = QLabel(self.widget)
         self.LBL_CURRENTDEVICE.setObjectName(u"LBL_CURRENTDEVICE")
 
-        self.LAYOUT_INFO.setWidget(2, QFormLayout.LabelRole, self.LBL_CURRENTDEVICE)
+        self.LAYOUT_INFO.setWidget(2, QFormLayout.ItemRole.LabelRole, self.LBL_CURRENTDEVICE)
 
         self.LAYOUT_DEVICE = QHBoxLayout()
         self.LAYOUT_DEVICE.setObjectName(u"LAYOUT_DEVICE")
@@ -258,7 +264,7 @@ class Ui_fgoMainWindow(object):
         self.LAYOUT_DEVICE.addWidget(self.BTN_CONNECT)
 
 
-        self.LAYOUT_INFO.setLayout(2, QFormLayout.FieldRole, self.LAYOUT_DEVICE)
+        self.LAYOUT_INFO.setLayout(2, QFormLayout.ItemRole.FieldRole, self.LAYOUT_DEVICE)
 
 
         self.LAYOUT_LAUNCH.addLayout(self.LAYOUT_INFO)
@@ -282,6 +288,11 @@ class Ui_fgoMainWindow(object):
         self.BTN_CLASSIC.setObjectName(u"BTN_CLASSIC")
 
         self.LAYOUT_FUNCBATTLE.addWidget(self.BTN_CLASSIC)
+
+        self.BTN_NEXT = QPushButton(self.widget)
+        self.BTN_NEXT.setObjectName(u"BTN_NEXT")
+
+        self.LAYOUT_FUNCBATTLE.addWidget(self.BTN_NEXT)
 
 
         self.LAYOUT_FUNC.addLayout(self.LAYOUT_FUNCBATTLE)
@@ -370,7 +381,8 @@ class Ui_fgoMainWindow(object):
         QWidget.setTabOrder(self.BTN_QUESTLOAD, self.BTN_MAIN)
         QWidget.setTabOrder(self.BTN_MAIN, self.BTN_BATTLE)
         QWidget.setTabOrder(self.BTN_BATTLE, self.BTN_CLASSIC)
-        QWidget.setTabOrder(self.BTN_CLASSIC, self.BTN_PAUSE)
+        QWidget.setTabOrder(self.BTN_CLASSIC, self.BTN_NEXT)
+        QWidget.setTabOrder(self.BTN_NEXT, self.BTN_PAUSE)
         QWidget.setTabOrder(self.BTN_PAUSE, self.BTN_STOP)
         QWidget.setTabOrder(self.BTN_STOP, self.BTN_SCREENSHOT)
         QWidget.setTabOrder(self.BTN_SCREENSHOT, self.BTN_STOPLATER)
@@ -403,8 +415,11 @@ class Ui_fgoMainWindow(object):
         self.MENU_SETTINGS.addAction(self.MENU_SETTINGS_DEFEATED)
         self.MENU_SETTINGS.addAction(self.MENU_SETTINGS_KIZUNAREISOU)
         self.MENU_SETTINGS.addAction(self.MENU_SETTINGS_SPECIALDROP)
+        self.MENU_SETTINGS.addAction(self.MENU_SETTINGS_STORYSKIP)
+        self.MENU_SETTINGS.addAction(self.MENU_SETTINGS_FRIENDALLTAB)
 
         self.retranslateUi(fgoMainWindow)
+        self.BTN_NEXT.clicked.connect(fgoMainWindow.runNext)
         self.BTN_CLASSIC.clicked.connect(fgoMainWindow.runClassic)
         self.BTN_MAIN.clicked.connect(fgoMainWindow.runMain)
         self.BTN_SCREENSHOT.clicked.connect(fgoMainWindow.screenshot)
@@ -469,6 +484,8 @@ class Ui_fgoMainWindow(object):
         self.MENU_SETTINGS_DEFEATED.setText(QCoreApplication.translate("fgoMainWindow", u"\u6218\u8d25\u64a4\u9000\u65f6\u7ec8\u6b62\u6218\u6597", None))
         self.MENU_SETTINGS_KIZUNAREISOU.setText(QCoreApplication.translate("fgoMainWindow", u"\u83b7\u5f97\u7f81\u7eca\u793c\u88c5\u65f6\u7ec8\u6b62\u6218\u6597", None))
         self.MENU_SETTINGS_SPECIALDROP.setText(QCoreApplication.translate("fgoMainWindow", u"\u82e5\u5e72\u7279\u6b8a\u6389\u843d\u540e\u7ec8\u6b62\u6218\u6597", None))
+        self.MENU_SETTINGS_STORYSKIP.setText(QCoreApplication.translate("fgoMainWindow", u"\u81ea\u52a8\u8df3\u8fc7\u5267\u60c5", None))
+        self.MENU_SETTINGS_FRIENDALLTAB.setText(QCoreApplication.translate("fgoMainWindow", u"\u52a9\u6218\u9009\u62e9\u524d\u5207\u6362\u5230\u201c\u5408\u201d", None))
         self.MENU_ABOUT_LICENSE.setText(QCoreApplication.translate("fgoMainWindow", u"\u4f7f\u7528\u8bb8\u53ef", None))
         self.MENU_FILE_QUIT.setText(QCoreApplication.translate("fgoMainWindow", u"\u9000\u51fa", None))
         self.MENU_CONTROL_TRAY.setText(QCoreApplication.translate("fgoMainWindow", u"\u5173\u95ed\u5230\u6258\u76d8", None))
@@ -537,6 +554,10 @@ class Ui_fgoMainWindow(object):
         self.BTN_CLASSIC.setStatusTip(QCoreApplication.translate("fgoMainWindow", u"\u57fa\u4e8e\u7ecf\u5178\u6218\u6597\u7684\u6e05\u7a7a\u4f53\u529b", None))
 #endif // QT_CONFIG(statustip)
         self.BTN_CLASSIC.setText(QCoreApplication.translate("fgoMainWindow", u"\u9648\u5e74\u8001\u809d", None))
+#if QT_CONFIG(statustip)
+        self.BTN_NEXT.setStatusTip(QCoreApplication.translate("fgoMainWindow", u"\u4ece\u5730\u56fe\u4e2d\u7684\u201c\u4e0b\u4e00\u4e2a\u201d\u8fde\u7eed\u63a8\u8fdb\u56fd\u670d\u4e3b\u7ebf", None))
+#endif // QT_CONFIG(statustip)
+        self.BTN_NEXT.setText(QCoreApplication.translate("fgoMainWindow", u"\u63a8\u8fdb\u4e3b\u7ebf", None))
 #if QT_CONFIG(statustip)
         self.BTN_PAUSE.setStatusTip(QCoreApplication.translate("fgoMainWindow", u"\u6682\u505c/\u7ee7\u7eed\u6218\u6597", None))
 #endif // QT_CONFIG(statustip)

@@ -84,10 +84,13 @@ Some commands support <command> [<subcommand> ...] {{-h, --help}} for further in
         key,value=line.split()
         value=eval(value)
         if hasattr(fgoKernel.schedule,key):getattr(fgoKernel.schedule,key)(value)
-        if key in self.config:self.config[key]=value
+        if key in self.config:
+            value=fgoKernel.configure(key,value)
+            self.config[key]=value
+            self.config.save()
     def complete_config(self,text,line,begidx,endidx):
         return self.completecommands({
-            '':['notifyEnable','stopLater','stopOnDefeated','stopOnKizunaReisou','stopOnSpecialDrop'],
+            '':['notifyEnable','stopLater','stopOnDefeated','stopOnKizunaReisou','stopOnSpecialDrop','storySkip','friendSearchMaxCycles','friendAllTab'],
         },text,line,begidx,endidx)
     def do_connect(self,line):
         'Connect to a device'
@@ -160,6 +163,18 @@ Some commands support <command> [<subcommand> ...] {{-h, --help}} for further in
         return self.completecommands({
             r'\d+':['gold','silver','bronze','copper','quartz'],
         },text,line,begidx,endidx)
+    def do_next(self,line):
+        'Advance through the CN main quest chain'
+        arg=parser_next.parse_args(line.split())
+        fgoKernel.schedule.stopLater(arg.appoint)
+        self.work=fgoKernel.Next(
+            arg.appleCount,
+            ['gold','silver','bronze','copper','quartz'].index(arg.appleKind),
+            arg.skipStory,
+            friendSearchMaxCycles=arg.friendSearchMaxCycles,
+        )
+        self.do_continue(f'-s {arg.sleep}')
+    def complete_next(self,text,line,begidx,endidx):return self.complete_main(text,line,begidx,endidx)
     def do_ping(self,line):
         'pong to log'
         logger.critical('pong')
@@ -285,6 +300,14 @@ parser_main.add_argument('appleKind',help='Apple Kind (default: %(default)s)',ty
 parser_main.add_argument('-s','--sleep',help='Sleep before run (default: %(default)s)',type=validator(str,lambda x:re.match(r'\d+([:.]\d+)*$',x),'timedelta'),default='0')
 parser_main.add_argument('-a','--appoint',help='Battle count limit (default: %(default)s for no limit)',type=validator(int,lambda x:x>=0,'nonnegative int'),default=0)
 parser_main.add_argument('-q','--quest',help='Goto different quests for different times',action='append',type=ArgStruct(lambda x:tuple(int(i)for i in x.split('-')),validator(int,lambda x:x>=0,'nonnegative int')),default=[],nargs=2)
+
+parser_next=ArgParser(prog='next',description=Cmd.do_next.__doc__)
+parser_next.add_argument('appleCount',help='Apple Count (default: %(default)s)',type=validator(int,lambda x:x>=0,'nonnegative int'),default=0,nargs='?')
+parser_next.add_argument('appleKind',help='Apple Kind (default: %(default)s)',type=str.lower,choices=['gold','silver','bronze','copper','quartz'],default='gold',nargs='?')
+parser_next.add_argument('-s','--sleep',help='Sleep before run (default: %(default)s)',type=validator(str,lambda x:re.match(r'\d+([:.]\d+)*$',x),'timedelta'),default='0')
+parser_next.add_argument('-a','--appoint',help='Real battle count limit (default: %(default)s for no limit)',type=validator(int,lambda x:x>=0,'nonnegative int'),default=0)
+parser_next.add_argument('--no-skip-story',help='Advance story normally instead of skipping it',dest='skipStory',action='store_false',default=True)
+parser_next.add_argument('--friend-search-cycles',help='Maximum support search cycles (default: %(default)s)',dest='friendSearchMaxCycles',type=validator(int,lambda x:x>=1,'positive int'),default=5)
 
 parser_press=ArgParser(prog='press',description=Cmd.do_press.__doc__)
 parser_press.add_argument('button',help='Button',type=str.upper)

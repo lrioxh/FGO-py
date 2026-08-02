@@ -24,6 +24,11 @@ fgoLogging.logger.handlers[-1].setLevel(arg.loglevel)
 
 from fgoConfig import Config
 config=Config(arg.config)
+
+import fgoKernel
+for key in('storySkip','friendSearchMaxCycles','friendAllTab'):
+    fgoKernel.configure(key,config[key])
+
 if not config.runOnce:config.runOnce=VERSION
 elif config.runOnce!=VERSION:
     from fgoRunOnce import runOnce

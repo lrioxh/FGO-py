@@ -32,6 +32,24 @@ from fgoMetadata import servantData,missionMat,missionTag,missionQuest
 from fgoReishift import reishift
 from fgoSchedule import ScriptStop,schedule
 logger=getLogger('Kernel')
+servantSkillOrder={444:(1,2,0)}
+storySkip=False
+
+def configure(key,value):
+    global storySkip
+    match key:
+        case'storySkip':
+            storySkip=bool(value)
+            return storySkip
+        case'friendSearchMaxCycles':
+            value=int(value)
+            if value<1:raise ValueError('friendSearchMaxCycles must be positive')
+            Main.friendSearchMaxCycles=value
+            return value
+        case'friendAllTab':
+            Next.friendAllTab=bool(value)
+            return Next.friendAllTab
+        case _:return value
 
 friendImg=ImageListener('fgoImage/friend/')
 mailImg=ImageListener('fgoImage/mail/')
@@ -47,12 +65,40 @@ def guardian():
     logger=logging.getLogger('Guardian')
     prev=None
     while True:
-        while XDetect.cache is prev:time.sleep(3)
-        if XDetect.cache.isNetworkError():
+        cache=Detect.cache
+        while cache is prev:
+            time.sleep(3)
+            cache=Detect.cache
+        if cache.isSupportFormationCondition():
+            logger.info('Close Support Formation Condition')
+            fgoDevice.device.touch((640,601))
+        elif not cache.isChooseFriend() and cache.isGameTapPrompt():
+            logger.info('Tap Game Screen')
+            fgoDevice.device.press(' ')
+        elif cache.isNetworkError():
             logger.warning('Reconnecting')
             fgoDevice.device.press('K')
-        prev=XDetect.cache
+        prev=cache
 threading.Thread(target=guardian,daemon=True,name='Guardian').start()
+
+def openCardSelection(maxUnknownFrames=10):
+    fgoDevice.device.perform(' ',(2100,))
+    unknownFrames=0
+    while unknownFrames<maxUnknownFrames:
+        detect=Detect(0,.3)
+        if detect.isCardSelection():return
+        if detect.isSkillCastFailed():
+            logger.warning('Close Skill Cast Failed Before Card Selection')
+            fgoDevice.device.press('J')
+            schedule.sleep(1)
+            unknownFrames=0
+        elif detect.isTurnBegin():
+            logger.warning('Card Selection Not Opened, Retry Attack')
+            fgoDevice.device.perform(' ',(1000,))
+            unknownFrames=0
+        else:unknownFrames+=1
+    raise ScriptStop('Card Selection Not Detected')
+
 class Farming:
     def __init__(self):
         self.logger=getLogger('Farming')
@@ -202,7 +248,7 @@ class ClassicTurn:
         logger.info(f'Turn {turn} Stage {self.stage} StageTurn {self.stageTurn} {self.servant}')
         if self.stageTurn==1:Detect.cache.setupEnemyGird()
         self.dispatchSkill()
-        fgoDevice.device.perform(' ',(2100,))
+        openCardSelection()
         fgoDevice.device.perform(self.selectCard(),(300,300,2300,1300,6000))
     def dispatchSkill(self):
         self.countDown=[[[max(0,j-1)for j in i]for i in self.countDown[0]],[max(0,i-1)for i in self.countDown[1]]]
@@ -218,13 +264,28 @@ class ClassicTurn:
     def getHouguInfo(self,pos,arg):return self.friendInfo[1][arg]if self.friend[pos]and self.friendInfo[1][arg]>=0 else self.houguInfo[self.orderChange[self.servant[pos]]][arg]
     def castServantSkill(self,pos,skill):
         fgoDevice.device.press(('ASD','FGH','JKL')[pos][skill])
-        if Detect(.7).isSkillNone():
+        detect=Detect(.7)
+        kukulkanChoice=detect.isKukulkanSkillChoice()
+        if kukulkanChoice:
+            logger.info('Select Kukulkan Skill Without Critical Stars')
+            fgoDevice.device.touch((640,425),700)
+            detect=Detect(.7)
+        targetCount=detect.getSkillTargetCount()if kukulkanChoice else 0
+        if targetCount:
+            target=pos+1 if skill==1 else self.getSkillInfo(pos,skill,2)or 3
+            fgoDevice.device.perform(
+                ['3333','2244','3234'][targetCount-1][target],(300,)
+            )
+        elif detect.isSkillNone():
             logger.warning(f'Skill {pos} {skill} Disabled')
             self.countDown[0][pos][skill]=999
-        elif Detect(.7).isSkillCastFailed():
-            self.countDown[pos][skill]=1
+        elif detect.isSkillCastFailed():
+            self.countDown[0][pos][skill]=1
             fgoDevice.device.press('J')
-        elif t:=Detect.cache.getSkillTargetCount():fgoDevice.device.perform(['3333','2244','3234'][t-1][self.getSkillInfo(pos,skill,2)],(300,))
+            schedule.sleep(1)
+        elif t:=detect.getSkillTargetCount():
+            target=self.getSkillInfo(pos,skill,2)or 3
+            fgoDevice.device.perform(['3333','2244','3234'][t-1][target],(300,))
     def castMasterSkill(self,skill):
         self.countDown[1][skill]=15
         fgoDevice.device.perform('Q'+'WER'[skill],(300,300))
@@ -258,11 +319,11 @@ class Turn:
         if self.stageTurn==1:Detect.cache.setupEnemyGird()
         self.enemy=[Detect.cache.getEnemyHp(i)for i in range(6)]
         self.dispatchSkill()
-        fgoDevice.device.perform(' ',(2100,))
+        openCardSelection()
         fgoDevice.device.perform(self.selectCard(),(300,300,2300,1300,6000))
     def dispatchSkill(self):
         self.countDown=[[[max(0,j-1)for j in i]for i in self.countDown[0]],[max(0,i-1)for i in self.countDown[1]]]
-        while skill:=[(0,i,j)for i in range(3)for j in range(3)if not self.countDown[0][i][j]and self.servant[i][0]and self.servant[i][6][j][0]and Detect.cache.isSkillReady(i,j)]: # +[(1,i)for i in range(3)if self.countDown[1][i]==0]:
+        while skill:=[(0,i,j)for i in range(3)for j in servantSkillOrder.get(self.servant[i][0],range(3))if not self.countDown[0][i][j]and self.servant[i][0]and self.servant[i][6][j][0]and Detect.cache.isSkillReady(i,j)]: # +[(1,i)for i in range(3)if self.countDown[1][i]==0]:
             for i in skill:
                 if i[0]==0:
                     match self.servant[i[1]][6][i[2]]:
@@ -376,13 +437,19 @@ class Turn:
         for _ in houguTargeted:
             self.enemy[self.target]=max(0,self.enemy[self.target]-48000)
             if any(self.enemy)and self.enemy[self.target]==0:self.target=next(i for i in range(5,-1,-1)if self.enemy[i])
+        def extraAttackWeight(card):
+            positions={group[i]for i in card}
+            if len(positions)!=1:return 0
+            pos=next(iter(positions))
+            if self.servant[pos][0]!=444:return 1
+            return max(1,sum(hp>0 for hp in self.enemy)/2)
         def evaluate(card):return(lambda chainError:(lambda colorChain:(lambda firstBonus:
                 sum(
                     ((.3*bool(firstBonus&4)+.1*bool(firstBonus&1)+[1.,1.2,1.4][i]*[1,.8,1.1][color[j]])*(1+min(1,critical[j]+.2*bool(firstBonus&2)))+bool(colorChain==2))*resist[j]*(not sealed[j])
                     for i,j in enumerate(card)if j<5
                 )
                 +4*(len([i for i in self.enemy if i])>1)*(self.enemy[self.target]<20000)*sum(bool(i)for i in numpy.diff([group[i]for i in card if i<5]))
-                +(1.8 if colorChain==-1 else 3)*(not chainError and len({group[i]for i in card})==1)*resist[card[0]]
+                +(1.8 if colorChain==-1 else 3)*(not chainError)*extraAttackWeight(card)*resist[card[0]]
                 +2.3*(colorChain==0)*len({group[i]for i in card if i<5 and np[group[i]]})
                 +3*(colorChain==1)
             )(7 if colorChain==3 else 1<<color[0]))(-1 if chainError else{(0,):0,(1):1,(2,):2,(0,1,2):3}.get(tuple(set(color[i]for i in card)),-1)))(any(sealed[i]for i in card if i<5))
@@ -390,15 +457,31 @@ class Turn:
         return''.join(['12345678'[i]for i in hougu+card+list({0,1,2,3,4}-set(card))])
     def castServantSkill(self,pos,skill,target):
         fgoDevice.device.press(('ASD','FGH','JKL')[pos][skill])
-        if Detect(.7).isSkillNone():
+        detect=Detect(.7)
+        kukulkanChoice=detect.isKukulkanSkillChoice()
+        if kukulkanChoice:
+            logger.info('Select Kukulkan Skill Without Critical Stars')
+            fgoDevice.device.touch((640,425),700)
+            detect=Detect(.7)
+        targetCount=detect.getSkillTargetCount()if kukulkanChoice else 0
+        if targetCount:
+            target=pos+1 if skill==1 else target or 3
+            fgoDevice.device.perform(
+                ['3333','2244','3234'][targetCount-1][target]+'\x08',
+                (300,700),
+            )
+        elif detect.isSkillNone():
             logger.warning(f'Skill {pos} {skill} Disabled')
             self.countDown[0][pos][skill]=999
             fgoDevice.device.press('\x08')
-        elif Detect.cache.isSkillCastFailed():
+        elif detect.isSkillCastFailed():
             logger.warning(f'Skill {pos} {skill} Cast Failed')
             self.countDown[0][pos][skill]=1
             fgoDevice.device.press('J')
-        elif t:=Detect.cache.getSkillTargetCount():fgoDevice.device.perform(['3333','2244','3234'][t-1][f-5 if(f:=self.servant[pos][6][skill][1])in{6,7,8}else target]+'\x08',(300,700))
+            schedule.sleep(1)
+        elif t:=detect.getSkillTargetCount():
+            target=f-5 if(f:=self.servant[pos][6][skill][1])in{6,7,8}else target or 3
+            fgoDevice.device.perform(['3333','2244','3234'][t-1][target]+'\x08',(300,700))
         else:fgoDevice.device.perform('\x08',(700,))
         while not Detect().isTurnBegin():pass
         Detect(.5)
@@ -409,17 +492,27 @@ class Turn:
         while not Detect().isTurnBegin():pass
         Detect(.5)
 class Battle:
-    def __init__(self,turnClass=Turn):
+    def __init__(self,turnClass=Turn,returnOnMainInterface=False):
         self.turn=0
         self.turnProc=turnClass()
         self.rainbowBox=False
+        self.returnOnMainInterface=returnOnMainInterface
+        self.directMainInterface=False
     def __call__(self):
         self.start=time.time()
         self.material={}
+        self.directMainInterface=False
         while True:
             if Detect(0,.3).isTurnBegin():
                 self.turn+=1
                 self.turnProc(self.turn)
+            elif self.returnOnMainInterface and Detect.cache.isMainInterface():
+                self.directMainInterface=True
+                logger.info('Battle Returned Directly To Main Interface')
+                return True
+            elif storySkip and Detect.cache.isStorySkipConfirm():
+                logger.info('Skip Story')
+                fgoDevice.device.press('K')
             elif Detect.cache.isSpecialDropSuspended():
                 schedule.checkKizunaReisou()
                 logger.warning('Kizuna Reisou')
@@ -438,7 +531,10 @@ class Battle:
                 logger.warning('Battle Defeated')
                 schedule.checkDefeated()
                 return False
-            fgoDevice.device.perform('\xBB\x08',(100,100))
+            if storySkip:
+                fgoDevice.device.perform('\xBB',(100,))
+                if Detect.cache.isStorySkip():fgoDevice.device.perform('\x08',(100,))
+            else:fgoDevice.device.perform('\xBB\x08',(100,100))
     @property
     def result(self):
         return{
@@ -446,10 +542,14 @@ class Battle:
             'turn':self.turn,
             'time':time.time()-self.start,
             'material':self.material,
+            'directMainInterface':self.directMainInterface,
         }
 class Main:
     teamIndex=0
     autoFormation=False
+    friendSearchMaxCycles=10
+    selectFirstFriendOnListEnd=False
+    friendAllTab=False
     def __init__(self,appleTotal=0,appleKind=0,battleClass=Battle):
         self.appleTotal=appleTotal
         self.appleKind=appleKind
@@ -470,7 +570,16 @@ class Main:
                         return logger.info('No Storm Pot')
                     if Detect(.7,.3).isApEmpty()and not self.eatApple():return logger.info('Ap Empty')
                     self.chooseFriend()
-                    while not Detect(0,.3).isBattleFormation():pass
+                    while True:
+                        detect=Detect(0,.3)
+                        if detect.isSupportFormationCondition():
+                            logger.info('Close Support Formation Condition')
+                            fgoDevice.device.touch((640,601))
+                        elif detect.isBattleFormation():
+                            if detect.isFormationRestriction():
+                                logger.info('Close Formation Restriction')
+                                fgoDevice.device.touch((640,601),1000)
+                            else:break
                     if self.teamIndex and Detect.cache.getTeamIndex()+1!=self.teamIndex:fgoDevice.device.perform('\x70\x71\x72\x73\x74\x75\x76\x77\x78\x79\x7A\x7B\x7C\x7D\x7E'[self.teamIndex-1],(1000,))
                     if self.autoFormation:fgoDevice.device.perform('\xDEL ',(1000,1500,1000))
                     fgoDevice.device.perform(' M ',(2000,2000,10000))
@@ -487,17 +596,18 @@ class Main:
                 elif Detect.cache.isSkillCastFailed():
                     fgoDevice.device.press('J')
                     return logger.info('No Storm Pot')
+                elif storySkip and Detect.cache.isStorySkipConfirm():
+                    logger.info('Skip Story')
+                    fgoDevice.device.press('K')
                 elif Detect.cache.isTurnBegin():break
                 elif Detect.cache.isAddFriend():fgoDevice.device.perform('X',(300,))
                 elif Detect.cache.isSpecialDropSuspended():fgoDevice.device.perform('\x1B',(300,))
-                fgoDevice.device.press('\xBB')
+                if storySkip and Detect.cache.isStorySkip():fgoDevice.device.press('\x08')
+                else:fgoDevice.device.press('\xBB')
             self.battleCount+=1
             logger.info(f'Battle {self.battleCount}')
             if self.battleProc():
-                battleResult=self.battleProc.result
-                self.battleTurn+=battleResult['turn']
-                self.battleTime+=battleResult['time']
-                self.material={i:self.material.get(i,0)+battleResult['material'].get(i,0)for i in self.material|battleResult['material']}
+                self._recordBattleResult()
                 fgoDevice.device.perform(' '*10,(400,)*10)
             else:
                 self.defeated+=1
@@ -510,6 +620,15 @@ class Main:
         self.battleTurn=0
         self.battleTime=0
         self.defeated=0
+    def _recordBattleResult(self):
+        result=self.battleProc.result
+        self.battleTurn+=result['turn']
+        self.battleTime+=result['time']
+        self.material={
+            i:self.material.get(i,0)+result['material'].get(i,0)
+            for i in self.material|result['material']
+        }
+        return result
     @property
     def result(self):return{
             'type':'Main',
@@ -527,29 +646,73 @@ class Main:
         fgoDevice.device.perform('W4K48'[self.appleKind]+'L',(600,1200))
         self.appleTotal-=1
         return self.appleTotal+1
+    def _waitFriendSelected(self):
+        missing=0
+        while missing<5:
+            if Detect(.2,.2).isChooseFriend():missing=0
+            else:missing+=1
+    def _selectFirstFriend(self):
+        fgoDevice.device.press('8')
+        self._waitFriendSelected()
     @logit(logger,logging.INFO)
-    def chooseFriend(self):
+    def chooseFriend(self,skipStory=None):
+        if skipStory is None:skipStory=storySkip
         refresh=False
         while not Detect(0,.3).isChooseFriend():
+            if Detect.cache.isSupportFormationCondition():
+                logger.info('Close Support Formation Condition')
+                fgoDevice.device.touch((640,601),1000)
+                continue
+            if Detect.cache.isBattleFormation():return
+            if skipStory and Detect.cache.isStorySkipConfirm():
+                logger.info('Skip Story')
+                fgoDevice.device.perform('K',(1200,))
+                continue
+            if skipStory and Detect.cache.isStorySkip():
+                logger.info('Open Story Skip Confirm')
+                fgoDevice.device.perform('\x08',(800,))
+                continue
             if Detect.cache.isNoFriend():
                 if refresh:schedule.sleep(10)
                 fgoDevice.device.perform('\xBAK',(500,1000))
                 refresh=True
                 continue
-            if Detect.cache.isBattleFormation():return
-        if not friendImg.flush():return fgoDevice.device.press('8')
+        if self.friendAllTab:
+            logger.info('Select All Support Tab')
+            fgoDevice.device.touch((700,130),1200)
+            Detect(.8,.3)
+        if not friendImg.flush():
+            self._selectFirstFriend()
+            return
+        searchCycles=0
         while True:
             timer=time.time()
             while True:
-                for i in(i for i,j in friendImg.items()if(lambda pos:pos and(fgoDevice.device.touch(pos),True)[-1])(Detect.cache.findFriend(j))):
+                for i in(i for i,j in sorted(friendImg.items())if(lambda pos:pos and(fgoDevice.device.touch(pos),True)[-1])(Detect.cache.findFriend(j))):
                     ClassicTurn.friendInfo=(lambda r:(lambda p:[
                         [[-1 if p[i*4+j]=='X'else int(p[i*4+j],16)for j in range(4)]for i in range(3)],
                         [-1 if p[i+12]=='X'else int(p[i+12],16)for i in range(2)],
                     ])(r.group())if r else[[[-1,-1,-1,-1],[-1,-1,-1,-1],[-1,-1,-1,-1]],[-1,-1]])(re.match('([0-9X]{3}[0-9A-FX]){3}[0-9X][0-9A-FX]$',i.replace('-','')[-14:].upper()))
+                    self._waitFriendSelected()
                     return i
-                if Detect.cache.isFriendListEnd():break
-                fgoDevice.device.swipe((400,600),(400,200))
-                Detect(.4)
+                if searchCycles>=self.friendSearchMaxCycles:
+                    logger.warning(f'Friend template not found after {searchCycles} search cycles, select first visible support')
+                    self._selectFirstFriend()
+                    return
+                if Detect.cache.isFriendListEnd():
+                    if self.selectFirstFriendOnListEnd:
+                        logger.warning('Friend list end reached, select first visible support')
+                        self._selectFirstFriend()
+                        return
+                    searchCycles+=1
+                    if searchCycles>=self.friendSearchMaxCycles:
+                        logger.warning(f'Friend template not found after {searchCycles} search cycles, select first visible support')
+                        self._selectFirstFriend()
+                        return
+                    break
+                fgoDevice.device.swipeSlow((600,650),(600,250),1.2)
+                searchCycles+=1
+                Detect(.8,.3)
             if refresh:schedule.sleep(max(0,timer+10-time.time()))
             fgoDevice.device.perform('\xBAK',(500,1000))
             refresh=True
@@ -570,3 +733,86 @@ class Operation(list,Main):
             goto(quest)
             super().__call__(quest[-1],self.battleCount+times if times else None)
     def prepare(self):pass
+
+class Next(Main):
+    friendAllTab=True
+    def __init__(self,appleTotal=0,appleKind=0,skipStory=True,battleClass=Battle,friendSearchMaxCycles=5):
+        super().__init__(appleTotal,appleKind,battleClass)
+        self.skipStory=skipStory
+        self.friendSearchMaxCycles=max(1,friendSearchMaxCycles)
+        self.selectFirstFriendOnListEnd=True
+    @serialize(mutex)
+    def __call__(self):
+        self.prepare()
+        if XDetect.region!='CN':
+            raise ScriptStop('Next Currently Supports CN Only')
+        nextMissing=0
+        unknownFrames=0
+        while True:
+            detect=Detect(.3,.3)
+            if detect.isSupportFormationCondition():
+                logger.info('Close Support Formation Condition')
+                fgoDevice.device.touch((640,601),1000)
+            elif detect.isBattleContinue():fgoDevice.device.perform('K',(1000,))
+            elif detect.isApEmpty():
+                if not self.eatApple():return logger.info('Ap Empty')
+            elif detect.isBattleFinished():
+                logger.info('Resume From Battle Result')
+                fgoDevice.device.perform(' '*10,(400,)*10)
+            elif detect.isChooseFriend():self.chooseFriend(self.skipStory)
+            elif detect.isBattleFormation():
+                if detect.isFormationRestriction():
+                    logger.info('Close Formation Restriction')
+                    fgoDevice.device.touch((640,601),1000)
+                else:
+                    if self.teamIndex and detect.getTeamIndex()+1!=self.teamIndex:fgoDevice.device.perform('\x70\x71\x72\x73\x74\x75\x76\x77\x78\x79\x7A\x7B\x7C\x7D\x7E'[self.teamIndex-1],(1000,))
+                    if self.autoFormation:fgoDevice.device.perform('\xDEL ',(1000,1500,1000))
+                    fgoDevice.device.perform(' M ',(2000,2000,10000))
+            elif detect.isTurnBegin():
+                self.battleProc=self.battleClass()
+                self.battleProc.returnOnMainInterface=True
+                self.battleCount+=1
+                logger.info(f'Battle {self.battleCount}')
+                if self.battleProc():
+                    battleResult=self._recordBattleResult()
+                    if not battleResult.get('directMainInterface'):fgoDevice.device.perform(' '*10,(400,)*10)
+                else:
+                    self.defeated+=1
+                    fgoDevice.device.perform('CIK',(500,500,500))
+                schedule.checkStopLater()
+            elif detect.isAddFriend():
+                logger.info('End Friend Request')
+                fgoDevice.device.perform('X',(1200,))
+            elif detect.isSpecialDropSuspended():fgoDevice.device.perform('\x1B',(300,))
+            elif detect.isMainInterface():
+                unknownFrames=0
+                if pos:=detect.findNext():
+                    nextMissing=0
+                    fgoDevice.device.touch(pos,1000)
+                else:
+                    nextMissing+=1
+                    if nextMissing>=20:return logger.info('No Next Quest')
+                continue
+            elif self.skipStory and detect.isStorySkipConfirm():
+                logger.info('Skip Story')
+                fgoDevice.device.perform('K',(1200,))
+            elif self.skipStory and detect.isStorySkip():
+                logger.info('Open Story Skip Confirm')
+                fgoDevice.device.perform('\x08',(800,))
+            elif pos:=detect.findStoryChoice():
+                logger.info('Select First Story Choice')
+                fgoDevice.device.touch(pos,1200)
+            else:
+                unknownFrames+=1
+                if self.skipStory:
+                    if unknownFrames>=20:
+                        return logger.warning(
+                            'Unknown Next State: stop to avoid blind clicks'
+                        )
+                    schedule.sleep(3)
+                else:
+                    logger.info('Advance Story')
+                    fgoDevice.device.touch((640,500),800)
+                continue
+            nextMissing=0
+            unknownFrames=0

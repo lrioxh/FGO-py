@@ -62,11 +62,29 @@ class Android(Airtest):
             time.sleep(.35)
             self.touch_proxy.handle('u 0\nc\n')
             time.sleep(.02)
+    def swipeSlow(self,begin,end,duration=1.2):
+        p1,p2=[
+            [
+                i[j]/self.scale+self.border[j]+self.render[j]
+                for j in range(2)
+            ]
+            for i in(begin,end)
+        ]
+        steps=max(2,round(duration/.02))
+        with self.mutex:
+            self.touch_proxy.swipe(
+                p1,p2,duration=duration,steps=steps
+            )
+            time.sleep(.35)
     def press(self,key):
         with self.mutex:super().touch(self.key[key])
     def pinch(self):
         with self.mutex:super().pinch(percent=.2)
-    def screenshot(self):return cv2.resize(super().snapshot()[self.render[1]+self.border[1]:self.render[1]+self.render[3]-self.border[1],self.render[0]+self.border[0]:self.render[0]+self.render[2]-self.border[0]],(1280,720),interpolation=cv2.INTER_CUBIC)
+    def screenshot(self):
+        im=super().snapshot()
+        if im.shape[0]>im.shape[1]:
+            im=cv2.rotate(im,cv2.ROTATE_90_CLOCKWISE if self.display_info['orientation']==1 else cv2.ROTATE_90_COUNTERCLOCKWISE)
+        return cv2.resize(im[self.render[1]+self.border[1]:self.render[1]+self.render[3]-self.border[1],self.render[0]+self.border[0]:self.render[0]+self.render[2]-self.border[0]],(1280,720),interpolation=cv2.INTER_CUBIC)
     def invoke169(self):
         x,y=(lambda r:(int(r.group(1)),int(r.group(2))))(re.search(r'(\d+)x(\d+)',self.adb.raw_shell('wm size')))
         if x*16<y*9:self.adb.raw_shell('wm size %dx%d'%(x,x*16//9))
