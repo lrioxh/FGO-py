@@ -90,7 +90,7 @@ Some commands support <command> [<subcommand> ...] {{-h, --help}} for further in
             self.config.save()
     def complete_config(self,text,line,begidx,endidx):
         return self.completecommands({
-            '':['notifyEnable','stopLater','stopOnDefeated','stopOnKizunaReisou','stopOnSpecialDrop','storySkip','friendSearchMaxCycles','friendAllTab'],
+            '':['notifyEnable','stopLater','stopOnDefeated','stopOnKizunaReisou','stopOnSpecialDrop','storySkip','friendSearchMaxCycles','friendAllTab','autoFormation'],
         },text,line,begidx,endidx)
     def do_connect(self,line):
         'Connect to a device'

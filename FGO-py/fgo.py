@@ -26,7 +26,12 @@ from fgoConfig import Config
 config=Config(arg.config)
 
 import fgoKernel
-for key in('storySkip','friendSearchMaxCycles','friendAllTab'):
+for key in(
+    'storySkip',
+    'friendSearchMaxCycles',
+    'friendAllTab',
+    'autoFormation',
+):
     fgoKernel.configure(key,config[key])
 
 if not config.runOnce:config.runOnce=VERSION

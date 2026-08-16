@@ -38,7 +38,15 @@ class Android(Airtest):
         self.scale,self.border=(720/self.render[3],(round(self.render[2]-self.render[3]*16/9)>>1,0))if self.render[2]*9>self.render[3]*16 else(1280/self.render[2],(0,round(self.render[3]-self.render[2]*9/16)>>1))
         self.key={c:[round(p[i]/self.scale+self.border[i]+self.render[i])for i in range(2)]for c,p in KEYMAP.items()}
     def touch(self,pos):
-        with self.mutex:super().touch([round(pos[i]/self.scale+self.border[i]+self.render[i])for i in range(2)])
+        point=[
+            round(pos[i]/self.scale+self.border[i]+self.render[i])
+            for i in range(2)
+        ]
+        with self.mutex:
+            logger.warning(
+                f'Input Touch logical={pos} physical={point}'
+            )
+            super().touch(point)
     def swipe(self,begin,end):
         p1,p2=[numpy.array(self._touch_point_by_orientation([i[j]/self.scale+self.border[j]+self.render[j]for j in range(2)]))for i in(begin,end)]
         vd=p2-p1
@@ -72,12 +80,26 @@ class Android(Airtest):
         ]
         steps=max(2,round(duration/.02))
         with self.mutex:
+            oriented=[
+                self._touch_point_by_orientation(i)
+                for i in(p1,p2)
+            ]
+            logger.warning(
+                f'Input SwipeSlow logical=({begin},{end}) '
+                f'physical=({p1},{p2}) oriented={oriented} '
+                f'duration={duration} steps={steps} '
+                f'method={self.touch_proxy.method_name}'
+            )
             self.touch_proxy.swipe(
                 p1,p2,duration=duration,steps=steps
             )
             time.sleep(.35)
     def press(self,key):
-        with self.mutex:super().touch(self.key[key])
+        with self.mutex:
+            logger.warning(
+                f'Input Press key={key!r} physical={self.key[key]}'
+            )
+            super().touch(self.key[key])
     def pinch(self):
         with self.mutex:super().pinch(percent=.2)
     def screenshot(self):

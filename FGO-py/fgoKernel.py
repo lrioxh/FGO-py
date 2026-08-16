@@ -49,11 +49,16 @@ def configure(key,value):
         case'friendAllTab':
             Next.friendAllTab=bool(value)
             return Next.friendAllTab
+        case'autoFormation':
+            Next.autoFormation=bool(value)
+            return Next.autoFormation
         case _:return value
 
 friendImg=ImageListener('fgoImage/friend/')
 mailImg=ImageListener('fgoImage/mail/')
 mutex=threading.Lock()
+friendSelectionActive=threading.Event()
+
 def serialize(lock):
     def decorator(func):
         @wraps(func)
@@ -72,7 +77,11 @@ def guardian():
         if cache.isSupportFormationCondition():
             logger.info('Close Support Formation Condition')
             fgoDevice.device.touch((640,601))
-        elif not cache.isChooseFriend() and cache.isGameTapPrompt():
+        elif (
+            not friendSelectionActive.is_set()
+            and not cache.isChooseFriend()
+            and cache.isGameTapPrompt()
+        ):
             logger.info('Tap Game Screen')
             fgoDevice.device.press(' ')
         elif cache.isNetworkError():
@@ -424,7 +433,21 @@ class Turn:
                 else:...
     @logit(logger,logging.INFO)
     def selectCard(self):
-        color,sealed,hougu,np,resist,critical,group=Detect().getCardColor()+[i[5][1]for i in self.servant],Detect.cache.isCardSealed(),Detect.cache.isHouguReady(),[Detect.cache.getFieldServantNp(i)<100 for i in range(3)],[[1,1.7,.6][i]for i in Detect.cache.getCardResist()],[i/10 for i in Detect.cache.getCardCriticalRate()],[next(j for j,k in enumerate(self.servant)if k[0]==i)for i in Detect.cache.getCardServant([i[0] for i in self.servant if i[0]])]+[0,1,2]
+        cardServant=Detect.cache.getCardServant(
+            [i[0]for i in self.servant if i[0]]
+        )
+        group=[
+            next(
+                (
+                    pos
+                    for pos,servant in enumerate(self.servant)
+                    if servant[0]==no
+                ),
+                card+3,
+            )
+            for card,no in enumerate(cardServant)
+        ]+[0,1,2]
+        color,sealed,hougu,np,resist,critical=Detect().getCardColor()+[i[5][1]for i in self.servant],Detect.cache.isCardSealed(),Detect.cache.isHouguReady(),[Detect.cache.getFieldServantNp(i)<100 for i in range(3)],[[1,1.7,.6][i]for i in Detect.cache.getCardResist()],[i/10 for i in Detect.cache.getCardCriticalRate()]
         houguTargeted,houguArea,houguSupport=[[j for j in range(3)if hougu[j]and self.servant[j][0]and self.servant[j][5][0]==i]for i in range(3)]
         houguArea=houguArea if self.stage==self.stageTotal or sum(i>0 for i in self.enemy)>1 and sum(self.enemy)>12000 else[]
         houguTargeted=houguTargeted if self.stage==self.stageTotal or max(self.enemy)>23000+8000*len(houguArea)else[]
@@ -441,6 +464,7 @@ class Turn:
             positions={group[i]for i in card}
             if len(positions)!=1:return 0
             pos=next(iter(positions))
+            if pos>=len(self.servant):return 0
             if self.servant[pos][0]!=444:return 1
             return max(1,sum(hp>0 for hp in self.enemy)/2)
         def evaluate(card):return(lambda chainError:(lambda colorChain:(lambda firstBonus:
@@ -450,7 +474,15 @@ class Turn:
                 )
                 +4*(len([i for i in self.enemy if i])>1)*(self.enemy[self.target]<20000)*sum(bool(i)for i in numpy.diff([group[i]for i in card if i<5]))
                 +(1.8 if colorChain==-1 else 3)*(not chainError)*extraAttackWeight(card)*resist[card[0]]
-                +2.3*(colorChain==0)*len({group[i]for i in card if i<5 and np[group[i]]})
+                +2.3*(colorChain==0)*len({
+                    group[i]
+                    for i in card
+                    if(
+                        i<5
+                        and group[i]<len(np)
+                        and np[group[i]]
+                    )
+                })
                 +3*(colorChain==1)
             )(7 if colorChain==3 else 1<<color[0]))(-1 if chainError else{(0,):0,(1):1,(2,):2,(0,1,2):3}.get(tuple(set(color[i]for i in card)),-1)))(any(sealed[i]for i in card if i<5))
         card=list(max(permutations(range(5),3-len(hougu)),key=lambda x:evaluate(hougu+list(x))))
@@ -652,10 +684,18 @@ class Main:
             if Detect(.2,.2).isChooseFriend():missing=0
             else:missing+=1
     def _selectFirstFriend(self):
+        logger.warning('FriendTrace Select First Visible Support')
         fgoDevice.device.press('8')
         self._waitFriendSelected()
     @logit(logger,logging.INFO)
     def chooseFriend(self,skipStory=None):
+        friendSelectionActive.set()
+        try:
+            return self._chooseFriend(skipStory)
+        finally:
+            friendSelectionActive.clear()
+
+    def _chooseFriend(self,skipStory=None):
         if skipStory is None:skipStory=storySkip
         refresh=False
         while not Detect(0,.3).isChooseFriend():
@@ -688,7 +728,16 @@ class Main:
         while True:
             timer=time.time()
             while True:
-                for i in(i for i,j in sorted(friendImg.items())if(lambda pos:pos and(fgoDevice.device.touch(pos),True)[-1])(Detect.cache.findFriend(j))):
+                for i,j in sorted(friendImg.items()):
+                    pos=Detect.cache.findFriend(j)
+                    logger.warning(
+                        f'FriendTrace Template={i} Position={pos}'
+                    )
+                    if pos is None:continue
+                    logger.warning(
+                        f'FriendTrace Touch Template={i} Position={pos}'
+                    )
+                    fgoDevice.device.touch(pos)
                     ClassicTurn.friendInfo=(lambda r:(lambda p:[
                         [[-1 if p[i*4+j]=='X'else int(p[i*4+j],16)for j in range(4)]for i in range(3)],
                         [-1 if p[i+12]=='X'else int(p[i+12],16)for i in range(2)],
@@ -710,7 +759,12 @@ class Main:
                         self._selectFirstFriend()
                         return
                     break
-                fgoDevice.device.swipeSlow((600,650),(600,250),1.2)
+                logger.warning(
+                    f'FriendTrace Swipe Cycle={searchCycles+1}'
+                )
+                fgoDevice.device.swipeSlow(
+                    (600,650),(600,250),1.2
+                )
                 searchCycles+=1
                 Detect(.8,.3)
             if refresh:schedule.sleep(max(0,timer+10-time.time()))
@@ -736,6 +790,7 @@ class Operation(list,Main):
 
 class Next(Main):
     friendAllTab=True
+    autoFormation=True
     def __init__(self,appleTotal=0,appleKind=0,skipStory=True,battleClass=Battle,friendSearchMaxCycles=5):
         super().__init__(appleTotal,appleKind,battleClass)
         self.skipStory=skipStory
@@ -753,6 +808,16 @@ class Next(Main):
             if detect.isSupportFormationCondition():
                 logger.info('Close Support Formation Condition')
                 fgoDevice.device.touch((640,601),1000)
+            elif detect.isAutoFormationDecide():
+                logger.info('Confirm Auto Formation')
+                fgoDevice.device.touch((1170,667),1000)
+            elif detect.isAutoFormationConfirm():
+                if self.autoFormation:
+                    logger.info('Run Auto Formation')
+                    fgoDevice.device.touch((930,602),1000)
+                else:
+                    logger.info('Cancel Auto Formation')
+                    fgoDevice.device.touch((350,602),1000)
             elif detect.isBattleContinue():fgoDevice.device.perform('K',(1000,))
             elif detect.isApEmpty():
                 if not self.eatApple():return logger.info('Ap Empty')
@@ -766,7 +831,6 @@ class Next(Main):
                     fgoDevice.device.touch((640,601),1000)
                 else:
                     if self.teamIndex and detect.getTeamIndex()+1!=self.teamIndex:fgoDevice.device.perform('\x70\x71\x72\x73\x74\x75\x76\x77\x78\x79\x7A\x7B\x7C\x7D\x7E'[self.teamIndex-1],(1000,))
-                    if self.autoFormation:fgoDevice.device.perform('\xDEL ',(1000,1500,1000))
                     fgoDevice.device.perform(' M ',(2000,2000,10000))
             elif detect.isTurnBegin():
                 self.battleProc=self.battleClass()

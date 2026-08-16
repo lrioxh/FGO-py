@@ -115,6 +115,8 @@ class XDetectBase(metaclass=logMeta(logger)):
     def isFpContinue(self):return self._compare(self.tmpl.FPCONTINUE,(646,639,883,707))
     def isFpSummon(self):return self._compare(self.tmpl.FPSUMMON,(643,20,812,67))
     def isGameTapPrompt(self):return False
+    def isAutoFormationConfirm(self):return False
+    def isAutoFormationDecide(self):return False
     def isKukulkanSkillChoice(self):return False
     def isFormationRestriction(self):return False
     def isSupportFormationCondition(self):return False
@@ -161,7 +163,37 @@ class XDetectBase(metaclass=logMeta(logger)):
             universe-=group
         return result
     def getCardResist(self):return[{0:1,1:2}.get(self._select((self.tmpl.WEAK,self.tmpl.RESIST),(180+257*i,318,226+257*i,417)if i<5 else(-695+232*i,54,-649+232*i,117)),0)for i in range(8)]
-    def getCardServant(self,hint):return(lambda target:[(lambda img:min((numpy.min(cv2.matchTemplate(img,i[0],cv2.TM_SQDIFF_NORMED,mask=i[1])),no)for no,card in target for i in card)[1])(self._crop((76+257*i,431,184+257*i,498)))for i in range(5)])([(i,servantImg[i][0])for i in hint])
+    def getCardServant(self,hint):
+        target=[
+            (no,servantImg[no][0])
+            for no in hint
+            if no in servantImg and servantImg[no][0]
+        ]
+        if not target:
+            logger.warning(
+                f'No Card Servant Template For {hint}'
+            )
+            return[None]*5
+        return[
+            min(
+                (
+                    numpy.min(
+                        cv2.matchTemplate(
+                            img,template,
+                            cv2.TM_SQDIFF_NORMED,
+                            mask=mask,
+                        )
+                    ),
+                    no,
+                )
+                for no,card in target
+                for template,mask in card
+            )[1]
+            for img in(
+                self._crop((76+257*i,431,184+257*i,498))
+                for i in range(5)
+            )
+        ]
     def getEnemyHp(self,pos):
         if self.enemyGird==0:return 0 if pos>2 else self._ocrInt((100+250*pos,40,222+250*pos,65))
         if self.enemyGird==2:return self._ocrInt((190+pos%3*200-pos//3*100,28+pos//3*99,287+pos%3*200-pos//3*100,53+pos//3*99))
@@ -223,11 +255,43 @@ class XDetectBase(metaclass=logMeta(logger)):
 class XDetectCN(XDetectBase):
     tmpl=IMG_CN
     ocr=OCR.ZHS
+    def isAutoFormationConfirm(self):
+        buttons=(
+            self._crop((220,560,500,640)),
+            self._crop((500,560,780,640)),
+            self._crop((780,560,1080,640)),
+        )
+        neutral=[
+            numpy.mean(
+                (numpy.min(button,axis=2)>150)
+                &(numpy.max(button,axis=2)-numpy.min(button,axis=2)<55)
+            )
+            for button in buttons
+        ]
+        return(
+            self._compare(
+                self.tmpl.AUTOFORMATIONCONFIRM,
+                (480,50,800,115),
+                .015,
+            )
+            and all(value>.4 for value in neutral)
+        )
+    def isAutoFormationDecide(self):
+        return self._compare(
+            self.tmpl.AUTOFORMATIONDECIDE,
+            (1060,610,1270,710),
+        )
     def isFormationRestriction(self):
         text=self.ocr.ocrArea(self._crop((200,60,1080,680)))
         return(
-            any('编成限制'in i for i in text)
-            and any('关闭'in i for i in text)
+            self._compare(
+                self.tmpl.FORMATIONCONDITION,
+                (500,60,780,130),
+            )
+            or(
+                any('编成限制'in i for i in text)
+                and any('关闭'in i for i in text)
+            )
         )
     def isKukulkanSkillChoice(self):
         return'不消耗'in(
@@ -253,6 +317,11 @@ class XDetectCN(XDetectBase):
         dark=(
             numpy.mean(gray[100:600,150:1130]<35,axis=1)>.65
         ).astype(numpy.uint8).reshape(-1,1)
+        dark=cv2.morphologyEx(
+            dark,
+            cv2.MORPH_CLOSE,
+            numpy.ones((11,1),numpy.uint8),
+        )
         _,_,stats,_=cv2.connectedComponentsWithStats(dark)
         cyan=cv2.inRange(
             cv2.cvtColor(self.im,cv2.COLOR_BGR2HSV),
