@@ -36,11 +36,13 @@ next --no-skip-story --friend-search-cycles 8
 config storySkip True
 config friendSearchMaxCycles 10
 config friendAllTab False
+config autoFormation True
 ```
 
 - `storySkip`：常规模式自动跳过剧情；图形界面“设置 → 自动跳过剧情”可切换。
 - `friendSearchMaxCycles`：常规模式搜索助战的最大翻页轮数，默认 `10`。
 - `friendAllTab`：控制 Next 模式是否在选择助战前切换“合”标签，默认 `True`；图形界面“设置 → 助战选择前切换到‘合’”可切换。Next 模式使用 `--friend-search-cycles` 单独设置其搜索上限，默认 `5`。
+- `autoFormation`：控制 Next 模式遇到自动编成确认界面时是否执行自动编成，默认 `True`；设为 `False` 时取消自动编成，保留当前编队。
 
 ## 从者适配：奥尔加玛丽（No.444）
 

@@ -38,14 +38,23 @@ class XDetectBase(metaclass=logMeta(logger)):
     enemyGird=0
     tmpl=IMG
     ocr=OCR.EN
-    def retryOnError(err=(TypeError,ValueError,IndexError,AssertionError)):
+    def retryOnError(
+        err=(TypeError,ValueError,IndexError,AssertionError),
+        maxRetries=None,
+    ):
         def wrapper(func):
             @wraps(func)
             def wrap(self,*args,**kwargs):
-                try:return func(self,*args,**kwargs)
-                except err:pass
-                logger.warning(f'Retry {getattr(func,"__qualname__",func)}({",".join(repr(i)for i in args)}{","if kwargs else""}{",".join("%s=%r"%i for i in kwargs.items())})')
-                return wrap(type(self)(),*args,**kwargs)
+                detect=self
+                retries=0
+                while True:
+                    try:return func(detect,*args,**kwargs)
+                    except err:
+                        if maxRetries is not None and retries>=maxRetries:
+                            raise
+                    retries+=1
+                    logger.warning(f'Retry {getattr(func,"__qualname__",func)}({",".join(repr(i)for i in args)}{","if kwargs else""}{",".join("%s=%r"%i for i in kwargs.items())})')
+                    detect=type(self)()
             return wrap
         return wrapper
     def __init__(self):
@@ -206,12 +215,20 @@ class XDetectBase(metaclass=logMeta(logger)):
     def getFieldServantNp(self,pos):return self._ocrInt((220+317*pos,655,271+317*pos,680))
     def getMaterial(self):return(lambda x:{materialImg[i][0]:x.count(i)for i in set(x)-{None}})([self._select(((i[1],None)for i in materialImg),(176+i%7*137,110+i//7*142,253+i%7*137,187+i//7*142),.02)for i in range(1,21)])
     def getSkillTargetCount(self):return(lambda x:numpy.bincount(numpy.diff(x),minlength=2)[1]+x[0])(cv2.dilate(numpy.max(cv2.threshold(numpy.max(self._crop((306,320,973,547)),axis=2),67,1,cv2.THRESH_BINARY)[1],axis=0).reshape(1,-1),numpy.ones((1,66),numpy.uint8)).ravel())if self._compare(self.tmpl.CROSS,(980,0,1280,300))else 0
-    @retryOnError()
+    @retryOnError(maxRetries=10)
     @validate()
-    def getStage(self):return self._ocrInt((884,14,902,37))
-    @retryOnError()
+    def getStage(self):
+        stage=self._ocrInt((884,14,902,37))
+        if stage==8 and not self._ocrInt((912,13,932,38)):
+            return 1
+        return stage
+    @retryOnError(maxRetries=10)
     @validate()
-    def getStageTotal(self):return self._ocrInt((912,13,932,38))
+    def getStageTotal(self):
+        total=self._ocrInt((912,13,932,38))
+        if not total and self._ocrInt((884,14,902,37))==8:
+            return 1
+        return total
     def getSummonHistory(self):XDetectBase._summonHistory=self._stack(XDetectBase._summonHistory,cv2.threshold(cv2.cvtColor(self._crop((147,157,1105,547)),cv2.COLOR_BGR2GRAY),128,255,cv2.THRESH_BINARY)[1],80)
     @classmethod
     def getSummonHistoryCount(cls):return cls.__new__(cls).inject(XDetectBase._summonHistory)._count((cls.tmpl.SUMMONHISTORY[0][...,0],cls.tmpl.SUMMONHISTORY[1]),(28,0,60,XDetectBase._summonHistory.shape[0]),.7)
@@ -289,7 +306,11 @@ class XDetectCN(XDetectBase):
                 (500,60,780,130),
             )
             or(
-                any('编成限制'in i for i in text)
+                any(
+                    keyword in i
+                    for i in text
+                    for keyword in ('编成限制','编制限制')
+                )
                 and any('关闭'in i for i in text)
             )
         )
@@ -305,13 +326,38 @@ class XDetectCN(XDetectBase):
         _,_,stats,_=cv2.connectedComponentsWithStats(mask)
         components=[tuple(map(int,i))for i in stats[1:]]
         for x,y,w,h,area in components:
-            if not(45<=w<=90 and 14<=h<=30 and area>=250 and w>=2*h and y<500):continue
-            glyphs=[i for i in components if i[4]>=60 and i[1]+i[3]<=y+2 and y-45<=i[1] and x-15<=i[0]+i[2]//2<=x+w+15]
+            normal=45<=w<=90 and 14<=h<=30 and area>=250 and w>=2*h
+            small=25<=w<45 and 8<=h<14 and area>=100 and w>=2*h
+            if (
+                y>=500
+                or x<40
+                or x+w>1240
+                or not(normal or small)
+            ):continue
+            glyphArea,yRange,margin=(60,45,15)if normal else(20,30,10)
+            glyphs=[
+                i for i in components
+                if i[4]>=glyphArea
+                and i[1]+i[3]<=y+2
+                and y-yRange<=i[1]
+                and x-margin<=i[0]+i[2]//2<=x+w+margin
+            ]
             if len(glyphs)>=2:return(x+w//2,(min(i[1]for i in glyphs)+y+h)//2)
     def findNext(self):
+        if pos:=self._find(
+            self.tmpl.NEXT,
+            (0,0,1280,720),
+            .05,
+        ):
+            return(pos[0],min(pos[1]+100,680))
+        if pos:=self._find(
+            self.tmpl.NEXTSMALL,
+            (0,0,1280,500),
+            .05,
+        ):
+            return(pos[0],min(pos[1]+100,680))
         if pos:=self._findNextMarker():
             return(pos[0],min(pos[1]+100,680))
-        return self._find(self.tmpl.NEXT,(0,0,1280,720))
     def findStoryChoice(self):
         gray=cv2.cvtColor(self.im,cv2.COLOR_BGR2GRAY)
         dark=(
@@ -337,7 +383,19 @@ class XDetectCN(XDetectBase):
         if len(choices)>=2:return min(choices,key=lambda pos:pos[1])
     def isAddFriend(self):return self._compare(self.tmpl.ADDFRIEND,(40,550,520,680))
     def isGameTapPrompt(self):return self._compare(self.tmpl.GAMETAP,(440,600,840,700))
-    def isSupportFormationCondition(self):return self._compare(self.tmpl.SUPPORTFORMATIONCONDITION,(500,60,780,130))
+    def isSupportFormationCondition(self):
+        button=self._crop((500,560,780,640))
+        neutral=(
+            (numpy.min(button,axis=2)>150)
+            &(numpy.max(button,axis=2)-numpy.min(button,axis=2)<55)
+        )
+        return(
+            self._compare(
+                self.tmpl.SUPPORTFORMATIONCONDITION,
+                (500,60,780,130),
+            )
+            and numpy.mean(neutral)>.4
+        )
     def isStorySkip(self):return self._compare(self.tmpl.STORYSKIPBUTTON,(1100,0,1280,85))
     def isStorySkipConfirm(self):return self._compare(self.tmpl.STORYSKIP,(425,275,855,365))
     @classmethod
